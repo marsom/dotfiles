@@ -26,6 +26,33 @@ dotfiles_fail() {
   exit
 }
 
+# cache directory for dotfiles commands
+DOTFILES_CACHE_DIR=${DOTFILES_CACHE_DIR:-"/tmp/.dotfiles-${USER}-$$"}
+
+# clear cache directory
+dotfiles_cache_clear() {
+  rm -rf ${DOTFILES_CACHE_DIR} 2>/dev/null
+}
+
+# http://www.advogato.org/person/shlomif/diary.html?start=670
+# What this function does is cache the result of a command in a file, and
+# use the file to output the results in case it exists.
+# Format is: cache "$basename_to_cache_in" $cmd $arg1 $arg2 $arg3...dotfiles_cache()
+{
+    local cache_fn="$1"
+    shift
+
+    if ! test -d "${DOTFILES_CACHE_DIR}"; then
+        mkdir -p "${DOTFILES_CACHE_DIR}"
+    fi
+
+    local fn="${DOTFILES_CACHE_DIR}/$cache_fn"
+    if ! test -f "$fn" ; then
+        "$@" > "$fn"
+    fi
+    cat "$fn"
+}
+
 # cache for dotfiles root directories
 DOTFILES_ROOTS_CACHE=${DOTFILES_ROOTS_CACHE:-""}
 
