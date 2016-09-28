@@ -1,0 +1,28 @@
+" .vimrc
+
+" Line numbers are good
+set number
+
+" Allow backspace in insert mode
+set backspace=indent,eol,start
+
+" Store lots of :cmdline history
+set history=2048
+
+" Show incomplete cmds down the bottom
+set showcmd
+
+" Show current mode down the bottom
+set showmode
+
+" Reload files changed outside vim
+set autoread                    
+
+" Turn on syntax highlighting
+syntax on
+
+" Wrap gitcommit file types at the appropriate length
+filetype indent plugin on
+
+" Enable plugin manager
+execute pathogen#infect()

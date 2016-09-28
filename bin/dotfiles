@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+
+DOTFILES_ACTION=$1
+shift 1
+DOTFILES_MODULES="$@"
+
+# print a info message
+dotfiles_info() {
+  printf "\r  [ \033[00;34m..\033[0m ] $1\n"
+}
+
+# print a user message
+dotfiles_user() {
+  printf "\r  [ \033[0;33m??\033[0m ] $1\n"
+}
+
+# print a success message
+dotfiles_success() {
+  printf "\r\033[2K  [ \033[00;32mOK\033[0m ] $1\n"
+}
+
+# print a error message
+dotfiles_fail() {
+  printf "\r\033[2K  [\033[0;31mFAIL\033[0m] $1\n"
+  echo ''
+  exit
+}
+
+# cache for dotfiles root directories
+DOTFILES_ROOTS_CACHE=${DOTFILES_ROOTS_CACHE:-""}
+
+# find all dotfiles root directories
+_dotfiles_roots() {
+  case "$(uname -s)" in
+  Darwin)
+    find ~ -mindepth 1 -maxdepth 1 -name ".dotfiles*" | tail -r
+    ;;
+  SunOS)
+    gfind ~ -mindepth 1 -maxdepth 1 -name ".dotfiles*" | tac
+    ;;
+  *)
+    find ~ -mindepth 1 -maxdepth 1 -name ".dotfiles*" | tac
+    ;;
+  esac
+}
+
+# find all dotfiles root directories (cached version)
+dotfiles_roots() {
+  if [ -z ${DOTFILES_ROOTS_CACHE} ]; then
+    DOTFILES_ROOTS_CACHE=$(_dotfiles_roots)
+  fi
+  for i in $DOTFILES_ROOTS_CACHE; do
+    echo $i
+  done
+}
+
+# cache for dotfiles profile directories
+DOTFILES_PROFILES_CACHE=${DOTFILES_PROFILES_CACHE:-""}
+
+# find all dotfiles profile directories
+_dotfiles_profiles() {
+  while read dotfiles_root
+  do
+    for profile in \
+      ${dotfiles_root}/os/$(uname -s) \
+      ${dotfiles_root}/kernel/$(uname -s) \
+      ${dotfiles_root}/kernel/All
+    do
+      if [ -d $profile ]; then
+        echo $profile
+      fi
+    done
+  done < <(dotfiles_roots)
+}
+
+# find all dotfiles profile directories (cached version)
+dotfiles_profiles() {
+  if [ -z ${DOTFILES_PROFILES_CACHE} ]; then
+    DOTFILES_PROFILES_CACHE=$(_dotfiles_profiles)
+  fi
+  for i in $DOTFILES_PROFILES_CACHE; do
+    echo $i
+  done
+}
+
+# cache for dotfiles module names
+DOTFILES_MODULES_CACHE=${DOTFILES_MODULES_CACHE:-""}
+
+# find all dotfiles module names
+_dotfiles_all_modules() {
+  while read profile
+  do
+    case "$(uname -s)" in
+    Darwin)
+      find -H ${profile} -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; 2>/dev/null
+      ;;
+    SunOS)
+      gfind -H ${profile} -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; 2>/dev/null
+      ;;
+    *)
+      find -H ${profile} -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; 2>/dev/null
+      ;;
+    esac
+  done < <(dotfiles_profiles) | sort -u
+}
+
+# find all dotfiles module names (cached version)
+dotfiles_all_modules() {
+  if [ -z ${DOTFILES_MODULES_CACHE} ]; then
+    DOTFILES_MODULES_CACHE=$(_dotfiles_all_modules)
+  fi
+  for i in $DOTFILES_MODULES_CACHE; do
+    echo $i
+  done
+}
+
+# find specified or all dotfiles module names
+dotfiles_modules() {
+  if [ -n "${DOTFILES_MODULES}" ]
+  then
+    for m in ${DOTFILES_MODULES}; do
+      echo $m
+    done
+  else
+    dotfiles_all_modules
+  fi
+}
+
+# link a file
+dotfiles_link_file () {
+  local src=$1 dst=$2
+
+  # if link is a file or directory but not already link
+  if [ ! -L "$dst" ] && [ -f "$dst" -o -d "$dst" ]
+  then
+    rm -rf "${dst}.backup" 2>/dev/null
+    mv "$dst" "${dst}.backup"
+    dotfiles_success "moved $dst to ${dst}.backup"
+  fi
+
+  # if link is a link or does not exists
+  if [ -L "$dst" -o ! -e "$dst" ]
+  then
+    if [ "$(readlink $dst)" = "$src" ]; then
+      dotfiles_info "skipped $1 to $2"
+    else
+      ln -sf "$1" "$2"
+      dotfiles_success "linked $1 to $2"
+    fi
+  else
+    dotfiles_fail "$dst is not a link or exits!"
+  fi
+}
+
+# link best maching module file
+dotfiles_link_module_file() {
+  local src=$1 dst=$2
+  while read profile; do
+    if [ -f ${profile}/${src} ]; then
+      dotfiles_link_file "${profile}/${module}/${src}" "${dst}"
+      break
+    fi
+  done < <(dotfiles_profiles)
+}
+
+# run install scripts, i.e. downlaod and install software
+dotfiles_install() {
+  while read module; do
+    while read profile; do
+      if [ -x ${profile}/${module}/dotfiles-install.sh ]; then
+        bash -c ${profile}/${module}/dotfiles-install.sh
+        break
+      fi
+    done < <(dotfiles_profiles)
+  done < <(dotfiles_modules)
+}
+
+# run configuration scripts, i.e. create links, files, directories
+dotfiles_configure() {
+  while read module; do
+    while read profile; do
+      if [ -x ${profile}/${module}/dotfiles-configure.sh ]; then
+        ${profile}/${module}/dotfiles-configure.sh
+        break
+      fi
+    done < <(dotfiles_profiles)
+  done < <(dotfiles_modules)
+}
+
+# log dotfiles directories
+dotfiles_log() {
+  if [ -n "${DOTFILES_MODULES}" ]
+  then
+    echo "using dotfiles folders: $(dotfiles_roots | xargs) and modules $DOTFILES_MODULES"
+  else
+    echo "using dotfiles folders: $(dotfiles_roots | xargs)"
+  fi
+}
+
+# command line interface
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]] ; then
+  case "${DOTFILES_ACTION}" in
+  "install")
+    dotfiles_log
+    dotfiles_install
+    ;;
+  "configure")
+    mkdir -p ~/bin
+    dotfiles_log
+    dotfiles_configure
+    ;;
+  "list-modules")
+    dotfiles_log
+    dotfiles_modules
+    ;;
+  "list-profiles")
+    dotfiles_log
+    dotfiles_profiles
+    ;;
+  *)
+    cat <<EOF
+usage: $0 install <module>
+       $0 configure <module>
+       $0 list-modules
+       $0 list-profiles
+
+source: $(dotfiles_roots | xargs)
+EOF
+    exit 1
+    ;;
+  esac
+fi
