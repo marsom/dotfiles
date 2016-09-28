@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
-info "Installing golang for you."
+dotfiles_info "dircolors-solarized: install"
 curl https://github.com/seebi/dircolors-solarized/raw/master/dircolors.ansi-dark -o ~/.dircolor.new
 

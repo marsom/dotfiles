@@ -5,9 +5,9 @@
 # Check for Homebrew
 if test ! $(which brew)
 then
-  info "Installing Homebrew for you."
+  dotfiles_info "homebrew: install."
   ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
 fi
 
-info "brew bundle"
+dotfiles_info "brew bundle"
 brew bundle --file=$(dirname $0)/Brewfile

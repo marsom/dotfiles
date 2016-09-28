@@ -2,7 +2,7 @@
 
 [ -r ~/.dotfiles/bin/dotfiles ] && source  ~/.dotfiles/bin/dotfiles || exit 5
 
-info "dircolors-solarized: install/update"
+dotfiles_info "dircolors-solarized: install/update"
 
 if [ ! -d ~/.dircolors-solarized ];
 then
@@ -12,4 +12,3 @@ else
   git pull
   popd &>/dev/null
 fi
-

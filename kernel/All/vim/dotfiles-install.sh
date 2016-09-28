@@ -2,19 +2,19 @@
 
 [ -r ~/.dotfiles/bin/dotfiles ] && source  ~/.dotfiles/bin/dotfiles || exit 5
 
-info "VIM: install/update: pathogen"
+dotfiles_info "VIM: install/update: pathogen"
 mkdir -p ~/.vim/autoload ~/.vim/bundle 
 curl -LSso ~/.vim/autoload/pathogen.vim https://tpo.pe/pathogen.vim
 
 function install_plugin() {
   local repo=$1 name=$(basename $1 .git)
   if [ -d ~/.vim/bundle/$name ]; then
-    info "VIM: update: $name"
+    dotfiles_info "VIM: update: $name"
     pushd ~/.vim/bundle/$name &>/dev/null
     git pull
     popd &>/dev/null
   else
-    info "VIM: install: $name"
+    dotfiles_info "VIM: install: $name"
     git clone $repo ~/.vim/bundle/$name
   fi
 }
