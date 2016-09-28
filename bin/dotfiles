@@ -38,7 +38,7 @@ dotfiles_cache_clear() {
 # What this function does is cache the result of a command in a file, and
 # use the file to output the results in case it exists.
 # Format is: cache "$basename_to_cache_in" $cmd $arg1 $arg2 $arg3...dotfiles_cache()
-{
+dotfiles_cache(){
     local cache_fn="$1"
     shift
 
