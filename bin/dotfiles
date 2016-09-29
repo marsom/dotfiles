@@ -53,9 +53,6 @@ dotfiles_cache(){
     cat "$fn"
 }
 
-# cache for dotfiles root directories
-DOTFILES_ROOTS_CACHE=${DOTFILES_ROOTS_CACHE:-""}
-
 # find all dotfiles root directories
 _dotfiles_roots() {
   case "$(uname -s)" in
@@ -73,16 +70,8 @@ _dotfiles_roots() {
 
 # find all dotfiles root directories (cached version)
 dotfiles_roots() {
-  if [ -z ${DOTFILES_ROOTS_CACHE} ]; then
-    DOTFILES_ROOTS_CACHE=$(_dotfiles_roots)
-  fi
-  for i in $DOTFILES_ROOTS_CACHE; do
-    echo $i
-  done
+  dotfiles_cache roots _dotfiles_roots
 }
-
-# cache for dotfiles profile directories
-DOTFILES_PROFILES_CACHE=${DOTFILES_PROFILES_CACHE:-""}
 
 # find all dotfiles profile directories
 _dotfiles_profiles() {
@@ -102,16 +91,8 @@ _dotfiles_profiles() {
 
 # find all dotfiles profile directories (cached version)
 dotfiles_profiles() {
-  if [ -z ${DOTFILES_PROFILES_CACHE} ]; then
-    DOTFILES_PROFILES_CACHE=$(_dotfiles_profiles)
-  fi
-  for i in $DOTFILES_PROFILES_CACHE; do
-    echo $i
-  done
+  dotfiles_cache profiles _dotfiles_profiles
 }
-
-# cache for dotfiles module names
-DOTFILES_MODULES_CACHE=${DOTFILES_MODULES_CACHE:-""}
 
 # find all dotfiles module names
 _dotfiles_all_modules() {
@@ -133,12 +114,7 @@ _dotfiles_all_modules() {
 
 # find all dotfiles module names (cached version)
 dotfiles_all_modules() {
-  if [ -z ${DOTFILES_MODULES_CACHE} ]; then
-    DOTFILES_MODULES_CACHE=$(_dotfiles_all_modules)
-  fi
-  for i in $DOTFILES_MODULES_CACHE; do
-    echo $i
-  done
+  dotfiles_cache modules _dotfiles_all_modules
 }
 
 # find specified or all dotfiles module names
