@@ -27,12 +27,15 @@ dotfiles_fail() {
 }
 
 # cache directory for dotfiles commands
-DOTFILES_CACHE_DIR=${DOTFILES_CACHE_DIR:-"/tmp/.dotfiles-${USER}-$$"}
+DOTFILES_CACHE_DIR=${DOTFILES_CACHE_DIR:-"/tmp/.dotfiles-${USER}/$$"}
 
 # clear cache directory
 dotfiles_cache_clear() {
   rm -rf ${DOTFILES_CACHE_DIR} 2>/dev/null
 }
+
+# clean up dotfiles cache after bash exits.
+trap dotfiles_cache_clear EXIT
 
 # http://www.advogato.org/person/shlomif/diary.html?start=670
 # What this function does is cache the result of a command in a file, and
@@ -43,7 +46,7 @@ dotfiles_cache(){
     shift
 
     if ! test -d "${DOTFILES_CACHE_DIR}"; then
-        mkdir -p "${DOTFILES_CACHE_DIR}"
+        mkdir -m 700 -p "${DOTFILES_CACHE_DIR}"
     fi
 
     local fn="${DOTFILES_CACHE_DIR}/$cache_fn"
