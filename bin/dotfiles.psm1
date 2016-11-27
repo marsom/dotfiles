@@ -174,6 +174,7 @@ function Set-DotfilesModuleLink {
   }
 }
 
+Export-ModuleMember -Function IsWindows
 Export-ModuleMember -Function Get-DotfilesRoots
 Export-ModuleMember -Function Get-DotfilesProfiles
 Export-ModuleMember -Function Set-DotfilesLink

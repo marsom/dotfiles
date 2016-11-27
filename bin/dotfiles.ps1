@@ -1,5 +1,7 @@
 #!/usr/bin/env powershell
 
+#Requires -Version 3
+
 param (
   [switch]$install = $false,
   [switch]$configure = $false,
@@ -96,6 +98,22 @@ if ($listprofiles) {
 if ($listmodules) {
   Get-DotfilesModules
   ExitWithCode 0
+}
+
+# mklink requires admin rights on vista, elevate permissions.
+if (IsWindows -and -not $IsCoreCLR) {
+  if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    if ((Get-WmiObject Win32_OperatingSystem | select BuildNumber).BuildNumber -ge 6000) {
+      Write-Verbose "Found UAC-enabled system. Elevating ..."
+      $CommandLine = $MyInvocation.Line.Replace($MyInvocation.InvocationName, $MyInvocation.MyCommand.Definition)
+      Start-Process -FilePath PowerShell.exe -Verb Runas -ArgumentList "$CommandLine"
+    } else {
+      Write-Verbose "System does not support UAC"
+      Write-Warning "This script requires administrative privileges. Elevation not possible. Please re-run with administrative account."
+      ExitWithCode 5
+    }
+    break
+  }
 }
 
 if ($install) {
