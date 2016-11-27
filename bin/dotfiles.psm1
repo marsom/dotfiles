@@ -30,6 +30,35 @@ function IsWindows() {
   return (Get-WmiObject Win32_OperatingSystem -ErrorAction Stop).Name.Contains("Windows")
 }
 
+function Get-SymLinkTarget {
+  <#
+    .Synopsis
+      get link target
+  #>
+  param(
+    [Parameter(Mandatory=$true)]
+    [string]$link
+  )
+  if ($IsCoreCLR) {
+    Get-Item $link | Select-Object -ExpandProperty Target
+  } elseif (IsWindows) {
+    $resolvedLink = Force-Resolve-Path -FileName $link
+    $basePath = Split-Path $resolvedLink
+    $folder = Split-Path -leaf $resolvedLink
+    $dir = cmd /c dir /a:l $basePath | Select-String $folder
+    $dir = $dir -join ' '
+    $regx = $folder + '\ *\[(.*?)\]'
+    $Matches = $null
+    $found = $dir -match $regx
+    if ($found) {
+        if ($Matches[1]) {
+            return $Matches[1]
+        }
+    }
+    return '' 
+  }
+}
+
 function New-SymLink {
   <#
     .Synopsis
@@ -123,7 +152,7 @@ function Set-DotfilesLink {
   if (Test-Path $dst) {
     $dstFile = Get-Item $dst -Force
 
-    $istLink = [bool]($dstFile.Attributes -band [IO.FileAttributes]::ReparsePoint)
+    $isLink = [bool]($dstFile.Attributes -band [IO.FileAttributes]::ReparsePoint)
     $isFile = [bool]($dstFile.Attributes -band [IO.FileAttributes]::Normal)
     $isDirectory = [bool]($dstFile.Attributes -band [IO.FileAttributes]::Directory)
     $isArchive = [bool]($dstFile.Attributes -band [IO.FileAttributes]::Archive)
@@ -140,7 +169,7 @@ function Set-DotfilesLink {
   if (Test-Path $dst) {
     # if target is correct skip it
     $srctarget = (Get-Item $src).FullName
-    $dsttarget = Get-Item $dst | Select-Object -ExpandProperty Target -ErrorAction SilentlyContinue
+    $dsttarget = Get-SymLinkTarget -link $dst
     Write-Debug "src target $srctarget"
     Write-Debug "dst target $dsttarget"
     if ($srctarget -eq $dsttarget) {
@@ -169,7 +198,7 @@ function Set-DotfilesModuleLink {
   Get-DotfilesProfiles | ForEach-Object {
     if (Test-Path -Path "$_/$src") {
       Set-DotfilesLink -src "$_/$src" -dst $dst
-      break
+      return
     }
   }
 }

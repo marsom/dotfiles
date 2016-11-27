@@ -25,7 +25,7 @@ function ExitWithCode {
     $exitcode
   )
   $host.SetShouldExit($exitcode)
-  exit
+  #exit
 }
 
 function Get-DotfilesModules {
@@ -106,7 +106,7 @@ if (IsWindows -and -not $IsCoreCLR) {
     if ((Get-WmiObject Win32_OperatingSystem | select BuildNumber).BuildNumber -ge 6000) {
       Write-Verbose "Found UAC-enabled system. Elevating ..."
       $CommandLine = $MyInvocation.Line.Replace($MyInvocation.InvocationName, $MyInvocation.MyCommand.Definition)
-      Start-Process -FilePath PowerShell.exe -Verb Runas -ArgumentList "$CommandLine"
+      Start-Process -FilePath PowerShell.exe -Verb Runas -ArgumentList "-noexit $CommandLine"
     } else {
       Write-Verbose "System does not support UAC"
       Write-Warning "This script requires administrative privileges. Elevation not possible. Please re-run with administrative account."
@@ -118,10 +118,10 @@ if (IsWindows -and -not $IsCoreCLR) {
 
 if ($install) {
   Install-DotfilesModules
-  ExitWithCode 0
+  #ExitWithCode 0
 }
 
 if ($configure) {
   Update-DotfilesModules
-  ExitWithCode 0
+  #ExitWithCode 0
 }
