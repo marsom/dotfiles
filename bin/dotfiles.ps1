@@ -22,7 +22,7 @@ function ExitWithCode {
   param (
     $exitcode
   )
-  $host.SetShouldExit($exitcode) 
+  $host.SetShouldExit($exitcode)
   exit
 }
 
@@ -35,8 +35,8 @@ function Get-DotfilesModules {
   if ($module) {
     $modules += $module 
   } else {
-    foreach ($dotfiles_root in Get-DotfilesProfiles) {
-      Get-ChildItem $dotfiles_root.FullName -Depth 1 -Directory | ForEach-Object {$modules += $_.Name} 
+    foreach ($root in Get-DotfilesProfiles) {
+      Get-ChildItem -Path $root.FullName -Directory | ForEach-Object {$modules += $_.Name} 
     }
   }
   return $modules | Select -Unique
