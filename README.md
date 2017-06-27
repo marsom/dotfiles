@@ -17,6 +17,7 @@ Windows (optional)
 * [Environment]::SetEnvironmentVariable("https_proxy", "http://proxy>:port", "User")
 * [Environment]::SetEnvironmentVariable("no_proxy", "localhost", "User")
 * [Environment]::SetEnvironmentVariable("ChocolateyInstall", "c:\\path\\to\\chocolatey", "User")
+* [Environment]::SetEnvironmentVariable("ChocolateyToolsLocation", "c:\\path\\to\\tools", "User")
 
 ### git based install
 
