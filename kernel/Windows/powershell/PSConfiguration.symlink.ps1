@@ -27,7 +27,7 @@ Get-DotfilesModuleNames | ForEach-Object {
             if (Test-Path -Path "$p/$m/$f") {
                 Write-Debug "source $p/$m/$f"
                 . "$p/$m/$f"
-                break
+                return
             }
         }
     }

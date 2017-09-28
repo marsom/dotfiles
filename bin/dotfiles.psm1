@@ -227,9 +227,111 @@ function Set-DotfilesModuleLink {
     }
 }
 
+function Get-DotfilesModules {
+    <#
+    .Synopsis
+      Get all available modules.
+    #>
+    param(
+        [Parameter(Mandatory = $false)]
+        [string[]]$Module
+    )
+    $modules = @()
+    if ($Module.Length -gt 0) {
+        $Module | ForEach-Object {
+            $modules += $_
+        } 
+    } else {
+        foreach ($root in Get-DotfilesProfiles) {
+            Get-ChildItem -Path $root.FullName -Directory | ForEach-Object {
+                $modules += $_.Name
+            } 
+        }
+    }
+    return $modules | Select-Object -Unique
+}
+
+function Install-DotfilesModules {
+    <#
+    .Synopsis
+      Install requried software.
+    #>
+    param(
+        [Parameter(Mandatory = $false)]
+        [string[]]$Module
+    )
+    if ($Module.Length -gt 0) {
+        Get-DotfilesModules -Module $Module | ForEach-Object {
+            $module = $_
+            Get-DotfilesProfiles | ForEach-Object {
+                $profile = $_
+                if (Test-Path -Path "$profile/$module/dotfiles-install.ps1") {
+                    Write-Debug "Execute $profile/$module/dotfiles-install.ps1"
+                    Invoke-Expression "$profile/$module/dotfiles-install.ps1"
+                    return
+                }
+            }
+        }
+    } else {
+        Get-DotfilesModules | ForEach-Object {
+            $module = $_
+            Get-DotfilesProfiles | ForEach-Object {
+                $profile = $_
+                if (Test-Path -Path "$profile/$module/dotfiles-install.ps1") {
+                    Write-Debug "Execute $profile/$module/dotfiles-install.ps1"
+                    Invoke-Expression "$profile/$module/dotfiles-install.ps1"
+                    return
+                }
+            }
+        }
+    }
+
+}
+
+function Update-DotfilesModules {
+    <#
+    .Synopsis
+      Update/Configure modules.
+    #>
+    param(
+        [Parameter(Mandatory = $false)]
+        [string[]]$Module
+    )
+    if ($Module.Length -gt 0) {
+        Get-DotfilesModules -Module $Module | ForEach-Object {
+            $module = $_
+            Get-DotfilesProfiles | ForEach-Object {
+                $profile = $_
+                if (Test-Path -Path "$profile/$module/dotfiles-configure.ps1") {
+                    Write-Debug "Execute $profile/$module/dotfiles-configure.ps1"
+                    Invoke-Expression "$profile/$module/dotfiles-configure.ps1"
+                    return
+                }
+            }
+        }
+    } else {
+        Get-DotfilesModules | ForEach-Object {
+            $module = $_
+            Get-DotfilesProfiles | ForEach-Object {
+                $profile = $_
+                if (Test-Path -Path "$profile/$module/dotfiles-configure.ps1") {
+                    Write-Debug "Execute $profile/$module/dotfiles-configure.ps1"
+                    Invoke-Expression "$profile/$module/dotfiles-configure.ps1"
+                    return
+                }
+            }
+        }
+    }
+}
+
+
 Export-ModuleMember -Function IsWindows
 Export-ModuleMember -Function Get-DotfilesRoots
 Export-ModuleMember -Function Get-DotfilesProfiles
 Export-ModuleMember -Function Get-DotfilesModuleNames
 Export-ModuleMember -Function Set-DotfilesLink
 Export-ModuleMember -Function Set-DotfilesModuleLink
+
+Export-ModuleMember -Function Get-DotfilesModules
+Export-ModuleMember -Function Install-DotfilesModules
+Export-ModuleMember -Function Update-DotfilesModules
