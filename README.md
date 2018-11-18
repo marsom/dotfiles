@@ -7,17 +7,19 @@ Profile-based, os-aware dotfiles which allows to mix private and public dotfiles
 **Warning:** If you want to give these dotfiles a try, 
 you should first fork this repository, review the code, and remove things you don’t want or need. Don’t blindly use my settings unless you know what that entails. Use at your own risk!
 
-Linux (optional):
-* export http_proxy=http://proxy>:port
-* export http_proxy=http://proxy>:port
+Linux/macOS (optional):
+* export http_proxy=http://proxy:port
+* export http_proxy=http://proxy:port
 * export http_proxy=localhost
 
 Windows (optional)
-* [Environment]::SetEnvironmentVariable("http_proxy", "http://proxy>:port", "User")
-* [Environment]::SetEnvironmentVariable("https_proxy", "http://proxy>:port", "User")
+* [Environment]::SetEnvironmentVariable("http_proxy", "http://proxy:port", "User")
+* [Environment]::SetEnvironmentVariable("https_proxy", "http://proxy:port", "User")
 * [Environment]::SetEnvironmentVariable("no_proxy", "localhost", "User")
 * [Environment]::SetEnvironmentVariable("ChocolateyInstall", "c:\\path\\to\\chocolatey", "User")
 * [Environment]::SetEnvironmentVariable("ChocolateyToolsLocation", "c:\\path\\to\\tools", "User")
+
+If you do not have a git installation, please install [brew](https://brew.sh/), [linuxbrew](http://linuxbrew.sh/), [Chocolatey](https://chocolatey.org/) and install git.
 
 ### git based install
 

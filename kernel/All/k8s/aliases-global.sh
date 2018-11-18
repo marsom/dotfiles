@@ -1,0 +1,1 @@
+alias tma='tmux attach'

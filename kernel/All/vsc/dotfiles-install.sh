@@ -5,6 +5,6 @@
 # Check for brew
 if test $(which brew)
 then
-  dotfiles_info "neovim install/update"
-  brew install neovim
+  dotfiles_info "visual studio code install/update"
+  brew cask install visual-studio-code
 fi

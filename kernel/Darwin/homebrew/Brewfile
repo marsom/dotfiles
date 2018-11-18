@@ -8,7 +8,6 @@ brew 'node'
 brew 'maven'
 brew 'vim', args: ['with-lua']
 cask 'java'
-cask 'atom'
 cask 'firefox'
 cask 'google-chrome'
 cask 'vlc'
