@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
-set -e
-
 tmux_kill() {
-  pkill -u $(id -u) tmux || true
+  while read pid; do
+    echo "killing tmux $pid"
+    kill -9 $pid 2>/dev/null
+  done < <(pgrep -u $(id -u) -f tmux | grep -v -e "^$BASHPID" -e "^$$")
 }
 
 case "$1" in

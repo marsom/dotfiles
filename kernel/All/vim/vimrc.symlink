@@ -21,6 +21,9 @@ set autoread
 " Turn on syntax highlighting
 syntax on
 
+" better inserts
+set paste
+
 " Wrap gitcommit file types at the appropriate length
 filetype indent plugin on
 
