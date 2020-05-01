@@ -115,7 +115,6 @@ function Get-DotfilesProfiles () {
     foreach ($root in Get-DotfilesRoots) {
         if (IsWindows) {
             $paths = @()
-            $paths += Join-Path (Join-Path $root.FullName 'os') 'Windows'
             $paths += Join-Path (Join-Path $root.FullName 'os') 'All'
             $paths += Join-Path (Join-Path $root.FullName 'kernel') 'Windows'
             $paths += Join-Path (Join-Path $root.FullName 'kernel') 'All'
@@ -127,9 +126,19 @@ function Get-DotfilesProfiles () {
         }
         elseif ($IsOSX) {
             $paths = @()
-            $paths += Join-Path (Join-Path $root.FullName 'os') 'Darwin'
             $paths += Join-Path (Join-Path $root.FullName 'os') 'All'
             $paths += Join-Path (Join-Path $root.FullName 'kernel') 'Darwin'
+            $paths += Join-Path (Join-Path $root.FullName 'kernel') 'All'
+            foreach ($path in $paths) {
+                if (Test-Path $path) {
+                    $profiles += Get-Item $path
+                }
+            }
+        }
+        elseif ($IsLinux) {
+            $paths = @()
+            $paths += Join-Path (Join-Path $root.FullName 'os') 'All'
+            $paths += Join-Path (Join-Path $root.FullName 'kernel') 'Linux'
             $paths += Join-Path (Join-Path $root.FullName 'kernel') 'All'
             foreach ($path in $paths) {
                 if (Test-Path $path) {
@@ -158,11 +167,49 @@ function Get-DotfilesModuleNames {
     return $modules | Select-Object -Unique
 }
 
+function Set-DotfilesCreateProfile {
+    <#
+    .Synopsis
+      Create the concatenated profile
+    #>
+    Write-Output "Create the concatenated profile" 
+
+    # source global files: PSConfiguration-global.ps1
+    Get-DotfilesModuleNames | ForEach-Object { 
+        $m = $_
+        Get-DotfilesProfiles | ForEach-Object {
+            $p = $_
+            foreach ($f in @("PSConfiguration-global.ps1")) {
+                Write-Debug "test $p/$m/$f"
+                if (Test-Path -Path "$p/$m/$f") {
+                    Write-Output "source $p/$m/$f"
+                }
+            }
+        }
+    }
+
+    # source best maching files: PSConfiguration.ps1
+    Get-DotfilesModuleNames | ForEach-Object {
+        $m = $_
+        Get-DotfilesProfiles | ForEach-Object {
+            $p = $_
+            foreach ($f in @("PSConfiguration.ps1")) {
+                Write-Debug "test $p/$m/$f"
+                if (Test-Path -Path "$p/$m/$f") {
+                    Write-Output "source $p/$m/$f"
+                    Get-Content -Path $p/$m/$f
+                    continue
+                }
+            }
+        }
+    }
+}
+
 function Set-DotfilesLink {
     <#
     .Synopsis
       Create a link and make a backup if necessary
-  #>
+    #>
     param(
         [Parameter(Mandatory = $true)]
         [string]$src,
@@ -331,6 +378,7 @@ Export-ModuleMember -Function Get-DotfilesProfiles
 Export-ModuleMember -Function Get-DotfilesModuleNames
 Export-ModuleMember -Function Set-DotfilesLink
 Export-ModuleMember -Function Set-DotfilesModuleLink
+Export-ModuleMember -Function Set-DotfilesCreateProfile
 
 Export-ModuleMember -Function Get-DotfilesModules
 Export-ModuleMember -Function Install-DotfilesModules

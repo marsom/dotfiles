@@ -115,6 +115,21 @@ _dotfiles_all_modules() {
   done < <(dotfiles_profiles) | sort -u
 }
 
+_dotfiles_all_modules_for_profile() {
+  profile=$1
+  case "$(uname -s)" in
+  Darwin)
+    find -H ${profile} -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; 2>/dev/null
+    ;;
+  SunOS)
+    gfind -H ${profile} -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; 2>/dev/null
+    ;;
+  *)
+    find -H ${profile} -mindepth 1 -maxdepth 1 -type d -exec basename '{}' \; 2>/dev/null
+    ;;
+  esac
+}
+
 # find all dotfiles module names (cached version)
 dotfiles_all_modules() {
   dotfiles_cache modules _dotfiles_all_modules
@@ -193,6 +208,114 @@ dotfiles_configure() {
   done < <(dotfiles_modules)
 }
 
+# create bashrc
+dotfiles_create_bashrc() {
+  _dotfiles_create_bashrc > ~/.bashrc.new
+  cmp --silent ~/.bashrc.new ~/.bashrc
+  if [ $? -eq 0 ]; then
+    dotfiles_info "skipped ~/.bashrc"
+  else
+    cp ~/.bashrc.new ~/.bashrc
+    dotfiles_success "updated ~/.bashrc"
+  fi
+}
+
+# run configuration scripts, i.e. create links, files, directories
+_dotfiles_create_bashrc() {
+  while read profile; do
+    if [ -f ${profile}/bash/bashrc.pre ]; then
+      echo "#"
+      echo "# source: ${profile}/bash/bashrc.pre"
+      echo "#"
+      cat ${profile}/bash/bashrc.pre
+      echo
+      break
+    fi
+  done < <(dotfiles_profiles)
+
+  echo "#"
+  echo "# source global files: {rc,functions,aliases}-global.{sh,bash}"
+  echo "#"
+  while read dotfiles_root
+  do
+    profile=${dotfiles_root}/kernel/All
+    if [ -d $profile ]; then
+      while read module; do
+        for i in {rc,functions,aliases}-global.{sh,bash}; do
+          if [ -f ${profile}/${module}/${i} ]; then
+            echo 
+            echo "# source: ${profile}/${module}/${i}"
+            cat ${profile}/${module}/${i}
+          fi
+        done
+      done < <(_dotfiles_all_modules_for_profile $profile)
+    fi
+  done < <(dotfiles_roots)
+  echo
+
+  for kernel_name in Linux Darwin; do
+    echo "if [ \"\$(uname -s)\" = \"${kernel_name}\" ]; then"
+    echo " # ${kernel_name}"
+    echo " :"
+    while read dotfiles_root
+    do
+      profile=${dotfiles_root}/kernel/${kernel_name}
+      if [ -d $profile ]; then
+        while read module; do
+          for i in {rc,functions,aliases}-global.{sh,bash}; do
+            if [ -f ${profile}/${module}/${i} ]; then
+              echo 
+              echo "# source: ${profile}/${module}/${i}"
+              cat ${profile}/${module}/${i}
+            fi
+          done
+        done < <(_dotfiles_all_modules_for_profile $profile)
+      fi
+    done < <(dotfiles_roots)
+    echo
+    echo "fi"
+  done
+  echo 
+
+  echo 
+  echo "#"
+  echo "# source best maching files: {rc,functions,aliases}.{sh,bash}"
+  echo "#"
+  for kernel_name in All Linux Darwin; do
+    echo "if [ \"\$(uname -s)\" = \"${kernel_name}\" ] || [ \"All\" = \"${kernel_name}\" ]; then"
+    echo " # ${kernel_name}"
+    echo " :"
+    while read dotfiles_root
+    do
+      profile=${dotfiles_root}/kernel/${kernel_name}
+      if [ -d $profile ]; then
+        while read module; do
+          for i in {rc,functions,aliases}.{sh,bash}; do
+            if [ -f ${profile}/${module}/${i} ]; then
+              echo 
+              echo "# source: ${profile}/${module}/${i}"
+              cat ${profile}/${module}/${i}
+            fi
+          done
+        done < <(_dotfiles_all_modules_for_profile $profile)
+      fi
+    done < <(dotfiles_roots)
+    echo
+    echo "fi"
+  done
+
+  while read profile; do
+    if [ -f ${profile}/bash/bashrc.post ]; then
+      echo "#"
+      echo "# source: ${profile}/bash/bashrc.post"
+      echo "#"
+      cat ${profile}/bash/bashrc.post
+      echo
+      break
+    fi
+  done < <(dotfiles_profiles)
+}
+
 # log dotfiles directories
 dotfiles_log() {
   if [ -n "${DOTFILES_MODULES}" ]
@@ -227,6 +350,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]] ; then
     cat <<EOF
 usage: $0 install <module>
        $0 configure <module>
+       $0 configure-bashrc
        $0 list-modules
        $0 list-profiles
 

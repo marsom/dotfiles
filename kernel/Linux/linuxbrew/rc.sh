@@ -1,4 +1,7 @@
-export PATH="~/.linuxbrew/bin:$PATH"
-export PATH="~/.linuxbrew/sbin:$PATH"
-export MANPATH="~/.linuxbrew/share/man:$MANPATH"
-export INFOPATH="~/.linuxbrew/share/info:$INFOPATH"
+
+function brew_enable() {
+    export PATH="~/.linuxbrew/bin:$PATH"
+    export PATH="~/.linuxbrew/sbin:$PATH"
+    export MANPATH="~/.linuxbrew/share/man:$MANPATH"
+    export INFOPATH="~/.linuxbrew/share/info:$INFOPATH"
+}
