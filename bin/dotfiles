@@ -222,6 +222,9 @@ dotfiles_create_bashrc() {
 
 # run configuration scripts, i.e. create links, files, directories
 _dotfiles_create_bashrc() {
+  echo _UNAME=\$\(uname -s\)
+  echo "test -r ~/.bashrc.local.pre && source ~/.bashrc.local.pre"
+
   while read profile; do
     if [ -f ${profile}/bash/bashrc.pre ]; then
       echo "#"
@@ -254,7 +257,7 @@ _dotfiles_create_bashrc() {
   echo
 
   for kernel_name in Linux Darwin; do
-    echo "if [ \"\$(uname -s)\" = \"${kernel_name}\" ]; then"
+    echo "if [ \"\${_UNAME}\" = \"${kernel_name}\" ]; then"
     echo " # ${kernel_name}"
     echo " :"
     while read dotfiles_root
@@ -282,7 +285,7 @@ _dotfiles_create_bashrc() {
   echo "# source best maching files: {rc,functions,aliases}.{sh,bash}"
   echo "#"
   for kernel_name in All Linux Darwin; do
-    echo "if [ \"\$(uname -s)\" = \"${kernel_name}\" ] || [ \"All\" = \"${kernel_name}\" ]; then"
+    echo "if [ \"\${_UNAME}\" = \"${kernel_name}\" ] || [ \"All\" = \"${kernel_name}\" ]; then"
     echo " # ${kernel_name}"
     echo " :"
     while read dotfiles_root
@@ -314,6 +317,8 @@ _dotfiles_create_bashrc() {
       break
     fi
   done < <(dotfiles_profiles)
+
+  echo "test -r ~/.bashrc.local.post && source ~/.bashrc.local.post"
 }
 
 # log dotfiles directories
@@ -337,6 +342,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]] ; then
     mkdir -p ~/bin
     dotfiles_log
     dotfiles_configure
+    ;;
+  "configure-bashrc")
+    mkdir -p ~/bin
+    dotfiles_log
+    dotfiles_create_bashrc
     ;;
   "list-modules")
     dotfiles_log
