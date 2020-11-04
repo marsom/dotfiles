@@ -1,4 +1,4 @@
-# Kusi's dotfiles
+# My dotfiles & software manager
 
 Profile-based, os-aware dotfiles which allows to mix private and public dotfiles repositories.
 

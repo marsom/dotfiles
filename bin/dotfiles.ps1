@@ -5,6 +5,7 @@
 param (
     [switch]$install = $false,
     [switch]$configure = $false,
+    [switch]$profile = $false,
     [switch]$listroots = $false,
     [switch]$listmodules = $false,
     [switch]$listprofiles = $false,
@@ -37,7 +38,7 @@ if ($listmodules) {
 }
 
 # creating symlinks on windows requires admin rights
-if (-not ($IsLinux -or $IsOSX) -and ($IsWindows -or (Get-WmiObject Win32_OperatingSystem -ErrorAction Stop).Name.Contains("Windows")) -and -not $IsCoreCLR) {
+if (-not ($IsLinux -or $IsOSX) -and ($IsWindows) -and -not $IsCoreCLR) {
     if (!([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { 
         Write-Warning "Found UAC-enabled system. Elevating ..."
         $CommandLine = $MyInvocation.Line.Replace($MyInvocation.InvocationName, $MyInvocation.MyCommand.Definition)
@@ -48,14 +49,15 @@ if (-not ($IsLinux -or $IsOSX) -and ($IsWindows -or (Get-WmiObject Win32_Operati
 
 if ($install) {
     Install-DotfilesModules
-    break endofscript
+    $host.SetShouldExit($exitcode)
 }
 
 if ($configure) {
     Update-DotfilesModules
-    break endofscript
+    $host.SetShouldExit($exitcode)
 }
 
-goto endofscript: {
+if ($profile) {
+    Update-DotfilesProfile
     $host.SetShouldExit($exitcode)
 }

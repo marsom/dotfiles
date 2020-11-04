@@ -23,11 +23,10 @@ function IsWindows() {
     if ($IsWindows) {
         return $true
     }
-    if ($IsLinux -or $IsOSX) {
+    if ($IsLinux -or $IsMacOS) {
         return $false
     }
-    # old windows / powershell version
-    return (Get-WmiObject Win32_OperatingSystem -ErrorAction Stop).Name.Contains("Windows")
+    return false
 }
 
 function Get-SymLinkTarget {
@@ -42,7 +41,7 @@ function Get-SymLinkTarget {
     if ($IsCoreCLR) {
         Get-Item $link | Select-Object -ExpandProperty Target
     }
-    elseif (IsWindows) {
+    elseif ($IsWindows) {
         $resolvedLink = Force-Resolve-Path -FileName $link
         $basePath = Split-Path $resolvedLink
         $folder = Split-Path -leaf $resolvedLink
@@ -124,7 +123,7 @@ function Get-DotfilesProfiles () {
                 }
             }
         }
-        elseif ($IsOSX) {
+        elseif ($IsMacOS) {
             $paths = @()
             $paths += Join-Path (Join-Path $root.FullName 'os') 'All'
             $paths += Join-Path (Join-Path $root.FullName 'kernel') 'Darwin'
@@ -372,6 +371,95 @@ function Update-DotfilesModules {
 }
 
 
+function Update-DotfilesProfile {
+    $new = $PROFILE.CurrentUserAllHosts + ".new"
+    $old = $PROFILE.CurrentUserAllHosts
+
+    New-Item -type directory -path $(Split-Path $PROFILE.CurrentUserAllHosts) -Force | Out-Null
+    
+    Write-Output '# Generated with Update-DotfilesProfile' > $new 
+
+    Write-Output 'Import-Module "~/.dotfiles/bin/dotfiles.psm1" -ErrorAction Stop' >> $new
+
+    Write-Output '# global files (All): PSConfiguration-global.ps1' >> $new 
+    Get-DotfilesModules | ForEach-Object {
+        $module = $_
+        Get-DotfilesProfiles | Where-Object { $_.Name -eq "All" } | ForEach-Object {
+            $profile = $_
+            if (Test-Path -Path "$profile/$module/PSConfiguration-global.ps1") {
+                Write-Output "# include $profile/$module/PSConfiguration-global.ps1" >> $new 
+                Get-Content "$profile/$module/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
+            }
+        }
+    }
+
+    Write-Output '# global files (OS): PSConfiguration-global.ps1' >> $new 
+    Write-Output 'if ($IsWindows) {' >> $new
+    Get-DotfilesModules | ForEach-Object {
+        $module = $_
+        Get-DotfilesProfiles | Where-Object { $_.Name -eq "Windows" } | ForEach-Object {
+            $profile = $_
+            if (Test-Path -Path "$profile/$module/PSConfiguration-global.ps1") {
+                Write-Output "# include $profile/$module/PSConfiguration-global.ps1" >> $new 
+                Get-Content "$profile/$module/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
+            }
+        }
+    }
+    Write-Output '}' >> $new 
+
+    Write-Output 'if ($IsLinux) {' >> $new
+    Get-DotfilesModules | ForEach-Object {
+        $module = $_
+        Get-DotfilesProfiles | Where-Object { $_.Name -eq "Linux" } | ForEach-Object {
+            $profile = $_
+            if (Test-Path -Path "$profile/$module/PSConfiguration-global.ps1") {
+                Write-Output "# include $profile/$module/PSConfiguration-global.ps1" >> $new 
+                Get-Content "$profile/$module/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
+            }
+        }
+    }
+    Write-Output '}' >> $new 
+
+    Write-Output 'if ($IsMacOS) {' >> $new
+    Get-DotfilesModules | ForEach-Object {
+        $module = $_
+        Get-DotfilesProfiles | Where-Object { $_.Name -eq "Darwin" } | ForEach-Object {
+            $profile = $_
+            if (Test-Path -Path "$profile/$module/PSConfiguration-global.ps1") {
+                Write-Output "# include $profile/$module/PSConfiguration-global.ps1" >> $new 
+                Get-Content "$profile/$module/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
+            }
+        }
+    }
+    Write-Output '}' >> $new 
+
+    Write-Output '# source best maching files: PSConfiguration.ps1' >> $new
+    ForEach ($module in Get-DotfilesModules) {
+        ForEach ($profile in Get-DotfilesProfiles) {
+            if (Test-Path -Path "$profile/$module/PSConfiguration.ps1") {
+                Write-Output "# include $profile/$module/PSConfiguration.ps1" >> $new 
+                Get-Content "$profile/$module/PSConfiguration.ps1" | Out-File -Append -FilePath $new
+                break
+            }
+        }
+    }
+
+    if (Test-Path $old) {
+        if(Compare-Object -ReferenceObject $(Get-Content $new) -DifferenceObject $(Get-Content $old)) {
+            Copy-Item $new $old
+            Write-Output "updated $old"
+        } else {
+            Write-Output "skipped $old"
+        }
+    } else {
+        Copy-Item $new $old
+        Write-Output "updated $old"
+    }
+}
+
+
+
+
 Export-ModuleMember -Function IsWindows
 Export-ModuleMember -Function Get-DotfilesRoots
 Export-ModuleMember -Function Get-DotfilesProfiles
@@ -383,3 +471,5 @@ Export-ModuleMember -Function Set-DotfilesCreateProfile
 Export-ModuleMember -Function Get-DotfilesModules
 Export-ModuleMember -Function Install-DotfilesModules
 Export-ModuleMember -Function Update-DotfilesModules
+Export-ModuleMember -Function Update-DotfilesProfile
+
