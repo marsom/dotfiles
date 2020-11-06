@@ -338,14 +338,10 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]] ; then
     dotfiles_log
     dotfiles_install
     ;;
-  "configure")
+  "update-profile")
     mkdir -p ~/bin
     dotfiles_log
     dotfiles_configure
-    ;;
-  "configure-bashrc")
-    mkdir -p ~/bin
-    dotfiles_log
     dotfiles_create_bashrc
     ;;
   "list-modules")
@@ -359,8 +355,7 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]] ; then
   *)
     cat <<EOF
 usage: $0 install <module>
-       $0 configure <module>
-       $0 configure-bashrc
+       $0 update-profile
        $0 list-modules
        $0 list-profiles
 

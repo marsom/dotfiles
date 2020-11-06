@@ -2,90 +2,15 @@
 
 #$DebugPreference = "Continue"
 
-function Force-Resolve-Path {
-    <#
-  .SYNOPSIS
-    Calls Resolve-Path but works for files that don't exist.
-  .REMARKS
-    From http://devhawk.net/2010/01/21/fixing-powershells-busted-resolve-path-cmdlet/
-  #>
-    param (
-        [string] $FileName
-    )
-    $FileName = Resolve-Path $FileName -ErrorAction SilentlyContinue -ErrorVariable _frperror
-    if (-not($FileName)) {
-        $FileName = $_frperror[0].TargetObject
-    }
-    return $FileName
-}
-
-function IsWindows() {
+function Get-DotfilesIsWindows() {
     if ($IsWindows) {
         return $true
     }
     if ($IsLinux -or $IsMacOS) {
         return $false
     }
-    return false
-}
-
-function Get-SymLinkTarget {
-    <#
-    .Synopsis
-      get link target
-  #>
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$link
-    )
-    if ($IsCoreCLR) {
-        Get-Item $link | Select-Object -ExpandProperty Target
-    }
-    elseif ($IsWindows) {
-        $resolvedLink = Force-Resolve-Path -FileName $link
-        $basePath = Split-Path $resolvedLink
-        $folder = Split-Path -leaf $resolvedLink
-        $dir = cmd /c dir /a:l $basePath | Select-String $folder
-        $dir = $dir -join ' '
-        $regx = $folder + '\ *\[(.*?)\]'
-        $Matches = $null
-        $found = $dir -match $regx
-        if ($found) {
-            if ($Matches[1]) {
-                return $Matches[1]
-            }
-        }
-        return '' 
-    }
-}
-
-function New-SymLink {
-    <#
-    .Synopsis
-      Create a link.
-  #>
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$link,
-        [Parameter(Mandatory = $true)]
-        [string]$target
-    )
-    if ($IsCoreCLR) {
-        New-Item -ItemType SymbolicLink -Path $link -Value $target
-    }
-    elseif (IsWindows) {
-        $resolvedLink = Force-Resolve-Path -FileName $link
-        $resolvedTarget = Force-Resolve-Path -FileName $target
-    
-        if (Test-Path -PathType Container $target) {
-            $command = "cmd /c mklink /d"
-        }
-        else {
-            $command = "cmd /c mklink"
-        }
-        Write-Debug "create legacy cmd='$command' link=$resolvedLink target=$resolvedTarget"
-        Invoke-Expression "$command $resolvedLink $resolvedTarget"
-    }
+    # old windows / powershell version
+    return (Get-WmiObject Win32_OperatingSystem -ErrorAction Stop).Name.Contains("Windows")
 }
 
 function Get-DotfilesRoots () {
@@ -112,7 +37,7 @@ function Get-DotfilesProfiles () {
   #>
     $profiles = @()
     foreach ($root in Get-DotfilesRoots) {
-        if (IsWindows) {
+        if (Get-DotfilesIsWindows) {
             $paths = @()
             $paths += Join-Path (Join-Path $root.FullName 'os') 'All'
             $paths += Join-Path (Join-Path $root.FullName 'kernel') 'Windows'
@@ -166,44 +91,6 @@ function Get-DotfilesModuleNames {
     return $modules | Select-Object -Unique
 }
 
-function Set-DotfilesCreateProfile {
-    <#
-    .Synopsis
-      Create the concatenated profile
-    #>
-    Write-Output "Create the concatenated profile" 
-
-    # source global files: PSConfiguration-global.ps1
-    Get-DotfilesModuleNames | ForEach-Object { 
-        $m = $_
-        Get-DotfilesProfiles | ForEach-Object {
-            $p = $_
-            foreach ($f in @("PSConfiguration-global.ps1")) {
-                Write-Debug "test $p/$m/$f"
-                if (Test-Path -Path "$p/$m/$f") {
-                    Write-Output "source $p/$m/$f"
-                }
-            }
-        }
-    }
-
-    # source best maching files: PSConfiguration.ps1
-    Get-DotfilesModuleNames | ForEach-Object {
-        $m = $_
-        Get-DotfilesProfiles | ForEach-Object {
-            $p = $_
-            foreach ($f in @("PSConfiguration.ps1")) {
-                Write-Debug "test $p/$m/$f"
-                if (Test-Path -Path "$p/$m/$f") {
-                    Write-Output "source $p/$m/$f"
-                    Get-Content -Path $p/$m/$f
-                    continue
-                }
-            }
-        }
-    }
-}
-
 function Set-DotfilesLink {
     <#
     .Synopsis
@@ -216,41 +103,17 @@ function Set-DotfilesLink {
         [string]$dst
     )
 
-    # if link is a file or directory but not already link
-    if (Test-Path $dst) {
-        $dstFile = Get-Item $dst -Force
-
-        $isLink = [bool]($dstFile.Attributes -band [IO.FileAttributes]::ReparsePoint)
-        $isFile = [bool]($dstFile.Attributes -band [IO.FileAttributes]::Normal)
-        $isDirectory = [bool]($dstFile.Attributes -band [IO.FileAttributes]::Directory)
-        $isArchive = [bool]($dstFile.Attributes -band [IO.FileAttributes]::Archive)
-
-        Write-Debug "$dst link=$isLink file=$isFile directory=$isDirectory archive=$isArchive"
-        if (!$isLink -and ($isFile -or $isDirectory -or $isArchive)) {
-            Remove-Item -Recurse -Force -Path "$dst.backup" -ErrorAction SilentlyContinue
-            Move-Item $dst "$dst.backup"
-            Write-Output "moved $dst to $dst.backup" 
-        }
-    }
-
     # if link is a link or does not exists
     if (Test-Path $dst) {
-        # if target is correct skip it
-        $srctarget = (Get-Item $src).FullName
-        $dsttarget = Get-SymLinkTarget -link $dst
-        Write-Debug "src target $srctarget"
-        Write-Debug "dst target $dsttarget"
-        if ($srctarget -eq $dsttarget) {
-            Write-Output "skipped $src to $dsttarget"
+        if(Compare-Object -ReferenceObject $(Get-Content $src) -DifferenceObject $(Get-Content $dst)) {
+            Copy-Item $src $dst
+            Write-Output "updated $dst ($src)"
+        } else {
+            Write-Output "skipped $dst"
         }
-        else {
-            New-SymLink -link $dst -target $src | Out-Null
-            Write-Output "linked $src to $dst"
-        }
-    }
-    else {
-        New-SymLink -link $dst -target $src | Out-Null
-        Write-Output "linked $src to $dst"
+    } else {
+        Copy-Item $src $dst
+        Write-Output "create $dst"
     }
 }
 
@@ -265,9 +128,9 @@ function Set-DotfilesModuleLink {
         [Parameter(Mandatory = $true)]
         [string]$dst
     ) 
-    Get-DotfilesProfiles | ForEach-Object {
-        if (Test-Path -Path "$_/$src") {
-            Set-DotfilesLink -src "$_/$src" -dst $dst
+    ForEach ($profile in Get-DotfilesProfiles) {
+        if (Test-Path -Path "$profile/$src") {
+            Set-DotfilesLink -src "$profile/$src" -dst $dst
             return
         }
     }
@@ -308,24 +171,24 @@ function Install-DotfilesModules {
     )
     if ($Module.Length -gt 0) {
         Get-DotfilesModules -Module $Module | ForEach-Object {
-            $module = $_
+            $m = $_
             Get-DotfilesProfiles | ForEach-Object {
-                $profile = $_
-                if (Test-Path -Path "$profile/$module/dotfiles-install.ps1") {
-                    Write-Debug "Execute $profile/$module/dotfiles-install.ps1"
-                    Invoke-Expression "$profile/$module/dotfiles-install.ps1"
+                $p = $_
+                if (Test-Path -Path "$p/$m/dotfiles-install.ps1") {
+                    Write-Debug "Execute $p/$m/dotfiles-install.ps1"
+                    Invoke-Expression "$p/$m/dotfiles-install.ps1"
                     return
                 }
             }
         }
     } else {
         Get-DotfilesModules | ForEach-Object {
-            $module = $_
+            $m = $_
             Get-DotfilesProfiles | ForEach-Object {
-                $profile = $_
-                if (Test-Path -Path "$profile/$module/dotfiles-install.ps1") {
-                    Write-Debug "Execute $profile/$module/dotfiles-install.ps1"
-                    Invoke-Expression "$profile/$module/dotfiles-install.ps1"
+                $p = $_
+                if (Test-Path -Path "$p/$m/dotfiles-install.ps1") {
+                    Write-Debug "Execute $p/$m/dotfiles-install.ps1"
+                    Invoke-Expression "$p/$m/dotfiles-install.ps1"
                     return
                 }
             }
@@ -345,24 +208,24 @@ function Update-DotfilesModules {
     )
     if ($Module.Length -gt 0) {
         Get-DotfilesModules -Module $Module | ForEach-Object {
-            $module = $_
+            $m = $_
             Get-DotfilesProfiles | ForEach-Object {
-                $profile = $_
-                if (Test-Path -Path "$profile/$module/dotfiles-configure.ps1") {
-                    Write-Debug "Execute $profile/$module/dotfiles-configure.ps1"
-                    Invoke-Expression "$profile/$module/dotfiles-configure.ps1"
+                $p = $_
+                if (Test-Path -Path "$p/$m/dotfiles-configure.ps1") {
+                    Write-Debug "Execute $p/$m/dotfiles-configure.ps1"
+                    Invoke-Expression "$p/$m/dotfiles-configure.ps1"
                     return
                 }
             }
         }
     } else {
         Get-DotfilesModules | ForEach-Object {
-            $module = $_
+            $m = $_
             Get-DotfilesProfiles | ForEach-Object {
-                $profile = $_
-                if (Test-Path -Path "$profile/$module/dotfiles-configure.ps1") {
-                    Write-Debug "Execute $profile/$module/dotfiles-configure.ps1"
-                    Invoke-Expression "$profile/$module/dotfiles-configure.ps1"
+                $p = $_
+                if (Test-Path -Path "$p/$m/dotfiles-configure.ps1") {
+                    Write-Debug "Execute $p/$m/dotfiles-configure.ps1"
+                    Invoke-Expression "$p/$m/dotfiles-configure.ps1"
                     return
                 }
             }
@@ -370,8 +233,7 @@ function Update-DotfilesModules {
     }
 }
 
-
-function Update-DotfilesProfile {
+function Update-DotfilesPowershellProfile {
     $new = $PROFILE.CurrentUserAllHosts + ".new"
     $old = $PROFILE.CurrentUserAllHosts
 
@@ -383,25 +245,25 @@ function Update-DotfilesProfile {
 
     Write-Output '# global files (All): PSConfiguration-global.ps1' >> $new 
     Get-DotfilesModules | ForEach-Object {
-        $module = $_
+        $m = $_
         Get-DotfilesProfiles | Where-Object { $_.Name -eq "All" } | ForEach-Object {
-            $profile = $_
-            if (Test-Path -Path "$profile/$module/PSConfiguration-global.ps1") {
-                Write-Output "# include $profile/$module/PSConfiguration-global.ps1" >> $new 
-                Get-Content "$profile/$module/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
+            $p = $_
+            if (Test-Path -Path "$p/$m/PSConfiguration-global.ps1") {
+                Write-Output "# include $p/$m/PSConfiguration-global.ps1" >> $new 
+                Get-Content "$p/$m/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
             }
         }
     }
 
     Write-Output '# global files (OS): PSConfiguration-global.ps1' >> $new 
-    Write-Output 'if ($IsWindows) {' >> $new
+    Write-Output 'if (Get-DotfilesIsWindows) {' >> $new
     Get-DotfilesModules | ForEach-Object {
-        $module = $_
+        $m = $_
         Get-DotfilesProfiles | Where-Object { $_.Name -eq "Windows" } | ForEach-Object {
-            $profile = $_
-            if (Test-Path -Path "$profile/$module/PSConfiguration-global.ps1") {
-                Write-Output "# include $profile/$module/PSConfiguration-global.ps1" >> $new 
-                Get-Content "$profile/$module/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
+            $p = $_
+            if (Test-Path -Path "$p/$m/PSConfiguration-global.ps1") {
+                Write-Output "# include $p/$m/PSConfiguration-global.ps1" >> $new 
+                Get-Content "$p/$m/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
             }
         }
     }
@@ -409,12 +271,12 @@ function Update-DotfilesProfile {
 
     Write-Output 'if ($IsLinux) {' >> $new
     Get-DotfilesModules | ForEach-Object {
-        $module = $_
+        $m = $_
         Get-DotfilesProfiles | Where-Object { $_.Name -eq "Linux" } | ForEach-Object {
-            $profile = $_
-            if (Test-Path -Path "$profile/$module/PSConfiguration-global.ps1") {
-                Write-Output "# include $profile/$module/PSConfiguration-global.ps1" >> $new 
-                Get-Content "$profile/$module/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
+            $p = $_
+            if (Test-Path -Path "$p/$m/PSConfiguration-global.ps1") {
+                Write-Output "# include $p/$momdule/PSConfiguration-global.ps1" >> $new 
+                Get-Content "$p/$m/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
             }
         }
     }
@@ -422,12 +284,12 @@ function Update-DotfilesProfile {
 
     Write-Output 'if ($IsMacOS) {' >> $new
     Get-DotfilesModules | ForEach-Object {
-        $module = $_
+        $m = $_
         Get-DotfilesProfiles | Where-Object { $_.Name -eq "Darwin" } | ForEach-Object {
-            $profile = $_
-            if (Test-Path -Path "$profile/$module/PSConfiguration-global.ps1") {
-                Write-Output "# include $profile/$module/PSConfiguration-global.ps1" >> $new 
-                Get-Content "$profile/$module/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
+            $p = $_
+            if (Test-Path -Path "$p/$m/PSConfiguration-global.ps1") {
+                Write-Output "# include $p/$m/PSConfiguration-global.ps1" >> $new 
+                Get-Content "$p/$m/PSConfiguration.ps1" | Out-File -Append -FilePath $new 
             }
         }
     }
@@ -457,19 +319,19 @@ function Update-DotfilesProfile {
     }
 }
 
+function Update-DotfilesProfile {
+    Update-DotfilesPowershellProfile
+    Update-DotfilesModules
+}
 
-
-
-Export-ModuleMember -Function IsWindows
-Export-ModuleMember -Function Get-DotfilesRoots
-Export-ModuleMember -Function Get-DotfilesProfiles
-Export-ModuleMember -Function Get-DotfilesModuleNames
-Export-ModuleMember -Function Set-DotfilesLink
 Export-ModuleMember -Function Set-DotfilesModuleLink
-Export-ModuleMember -Function Set-DotfilesCreateProfile
 
+Export-ModuleMember -Function Get-DotfilesIsWindows
+Export-ModuleMember -Function Get-DotfilesRoots
 Export-ModuleMember -Function Get-DotfilesModules
+Export-ModuleMember -Function Get-DotfilesProfiles
 Export-ModuleMember -Function Install-DotfilesModules
-Export-ModuleMember -Function Update-DotfilesModules
 Export-ModuleMember -Function Update-DotfilesProfile
 
+# Export-ModuleMember -Function Update-DotfilesModules
+# Export-ModuleMember -Function Update-DotfilesPowershellProfile
